@@ -8,7 +8,6 @@
 #include <chrono>
 #include <mutex>
 #include <sstream>
-#include "main.hpp"
 #include "internal.h"
 
 //ACCESS ONLY UNDER MUTEX (NOT THREAD SAFE)
@@ -60,6 +59,143 @@ int Proctest(std::vector<std::string> args, Core& core){
     return 0;
 }
 
+const std::string DIR_SUFFIX = "_DIR" + std::string('\x1F', 1);
+
+int MakeDir(std::vector<std::string> args, Core& core){
+    if (args.size() < 1) {
+        std::cout << "Usage: mkdir <directory_name>" << std::endl;
+        return -1;
+    }
+    std::string dirName = args[0];
+    Ellement dirEl(dirName+DIR_SUFFIX, {}, true);
+    FileSystem fs;
+    fs.WriteDataTo(dirEl.name, dirEl.data);
+    return 0;
+}
+
+int WriteFs(std::vector<std::string> args, Core& core) {
+    if (args.size() < 2) {
+        std::cout << "Usage: writefs <file_name> <content>" << std::endl;
+        return -1;
+    }
+
+    std::string path = args[0];
+    std::stringstream ss(path);
+    std::string segment;
+    std::vector<std::string> segments;
+
+    while (std::getline(ss, segment, '/')) {
+        if (!segment.empty()) {
+            segments.push_back(segment);
+        }
+    }
+
+    if (segments.empty()) {
+        std::cout << "Invalid path" << std::endl;
+        return -1;
+    }
+
+    if (segments.size()==1){
+        FileSystem::db.AddStr(segments[0], args[1]);
+        return 0;
+    }
+
+    Map<Ellement> current =
+        FileSystem::db.ReadMapEx(segments[0]);
+
+    for (int i = 1; i < segments.size() - 1; i++) {
+        current = current.Get(segments[i]).GetMap();
+    }
+
+    current.Set(segments.back(), Ellement{args[1]});
+
+    FileSystem::db.AddMapEx(segments[0], current);
+
+    FileSystem().DumpToFile("filesystem.db");
+
+    return 0;
+}
+
+int SaveFile(std::vector<std::string> args, Core& core){
+    if (args.size() < 1) {
+        std::cout << "Usage: createfile <file_name>" << std::endl;
+        return -1;
+    }
+    std::string path = args[0];
+    std::stringstream ss(path);
+    std::string segment;
+    std::vector<std::string> segments;
+    while (std::getline(ss, segment, '/')) {
+        if (!segment.empty()) {
+            segments.push_back(segment);
+        }
+    }
+    if (segments.size()==1){
+        FileSystem::db.AddStr(segments[0], "");
+        FileSystem().DumpToFile("filesystem.db");
+        return 0;
+    }
+    Map<Ellement> current=FileSystem::db.
+        ReadMapEx(segments[0]);
+    for (int i=1;i<segments.size()-1;i++){
+        current=current.Get(segments[i]).GetMap();
+    }
+    current.Set(segments.back(), Ellement{""});
+    for (int i=segments.size()-1;i>0;i--){
+        Map m=FileSystem::db.ReadMapEx(segments[i-1]);
+        m.Set(segments[i], Ellement{current, true});
+        current=m;
+    }
+    FileSystem::db.AddMapEx(segments[0], current);
+    FileSystem().DumpToFile("filesystem.db");
+    return 0;
+}
+
+int OpenFile(std::vector<std::string> args, Core& core){
+    if (args.size() < 1) {
+        std::cout << "Usage: openfile <file_name>" << std::endl;
+        return -1;
+    }
+
+    std::string path = args[0];
+    std::stringstream ss(path);
+    std::string segment;
+    std::vector<std::string> segments;
+
+    while (std::getline(ss, segment, '/')) {
+        if (!segment.empty()) {
+            segments.push_back(segment);
+        }
+    }
+
+    if (segments.empty()) {
+        std::cout << "Invalid path" << std::endl;
+        return -1;
+    }
+
+    if (segments.size()==1){
+        std::string str;
+        str.resize(FileSystem::db.attrs[segments[0]].size());
+        memcpy(str.data(), FileSystem::db.attrs[segments[0]].data(),
+            FileSystem::db.attrs[segments[0]].size());
+        std::cout<<str<<std::endl;
+        return 0;
+    }
+
+    Map<Ellement> current =
+        FileSystem::db.ReadMapEx(segments[0]);
+
+    for (int i = 1; i < segments.size() - 1; i++) {
+        current = current.Get(segments[i]).GetMap();
+    }
+
+    Ellement file = current.Get(segments.back());
+
+    std::cout << file.GetStr() << std::endl;
+
+    return 0;
+}
+
 int isTimerFinished(std::vector<std::string> args, Core& core) {
     if (_finished) {
         std::cout << "Timer has finished." << std::endl;
@@ -70,10 +206,10 @@ int isTimerFinished(std::vector<std::string> args, Core& core) {
 }
 
 int main(){
-    DataBase db("filesystem.db");
-    if (db.attrs.find("main") == db.attrs.end()) {
-        std::vector<Ellement> mainElements;
-        db.AddMapEx("main", mainElements);
+    if (FileSystem::db.attrs.find("inited") == FileSystem::db.attrs.end()) {
+        FileSystem f;
+        f.WriteDataTo("inited", std::vector<uint8_t>{1});
+        f.DumpToFile("filesystem.db");
     }
     {
         std::lock_guard<std::mutex> lock(Globals::CommandsMutex);
@@ -81,7 +217,10 @@ int main(){
         Globals::Commands["exit"] = Leave;
         Globals::Commands["settimer"] = static_cast<int(*)(std::vector<std::string>, Core&)>(SetTimer);
         Globals::Commands["istimerfinished"] = static_cast<int(*)(std::vector<std::string>, Core&)>(isTimerFinished);
+        Globals::Commands["createfile"] = static_cast<int(*)(std::vector<std::string>, Core&)>(SaveFile);
+        Globals::Commands["openfile"] = static_cast<int(*)(std::vector<std::string>, Core&)>(OpenFile);
         Globals::Commands["proctest"] = static_cast<int(*)(std::vector<std::string>, Core&)>(Proctest);
+        Globals::Commands["writefs"] = static_cast<int(*)(std::vector<std::string>, Core&)>(WriteFs);
     }
     while (true){
         std::string name;

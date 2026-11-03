@@ -7,6 +7,7 @@
 #include <mutex>
 #include <sstream>
 #include <windows.h>
+#include "main.hpp"
 
 std::future_status getFutureStatus(std::future<int>& fut) {
     using namespace std::chrono_literals;
@@ -54,5 +55,26 @@ struct Core{
         return processes;
     }
 };
+
+struct FileSystem{
+    static DataBase db;
+    FileSystem()=default;
+    void WriteDataTo(const std::string& key, const std::vector<uint8_t>& data){
+        db.attrs[key]=data;
+    }
+    void ReadDataFrom(const std::string& key, std::vector<uint8_t>& data){
+        if (db.attrs.find(key) != db.attrs.end()){
+            data=db.attrs[key];
+        }
+        else{
+            throw std::runtime_error("Key not found in filesystem: "+key);
+        }
+    }
+    void DumpToFile(const std::string& path){
+        db.WriteTo(path);
+    }
+};
+
+DataBase FileSystem::db("filesystem.db");
 
 __declspec(dllexport) Core core;
