@@ -15,15 +15,18 @@ namespace Globals{
 }
 
 struct Process{
-    void (*func)();
-    int priotity=1;
+    int (*func)();
+    int priority=1;
     public:
     Process(std::string path){
         HMODULE sym=LoadLibraryA(path.c_str());
-        func=(void(*)())GetProcAddress(sym, "main");
+        func=(int(*)())GetProcAddress(sym, "main");
     }
-    void update(){
-        func();
+    int launch(){
+        return func();
+    }
+    std::future<int> launchAsync(){
+        return std::async(std::launch::async, func);
     }
 };
 
@@ -34,17 +37,6 @@ struct Core{
 
 int main(){
     Core core;
-    std::thread(std::launch::async, [&](){
-        while (true){
-            {
-                std::lock_guard<std::mutex> lock(core.procMutex);
-                for (auto &process:core.processes){
-                    process.update();
-                }
-            }
-            std::this_thread::sleep_for(std::chrono::milliseconds(10));
-        }
-    }).detach();
     while (true){
         std::string name;
         std::string args;
