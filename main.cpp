@@ -8,6 +8,12 @@
 #include <chrono>
 #include <mutex>
 
+std::future_status getFutureStatus(std::future<int>& fut) {
+    using namespace std::chrono_literals;
+    auto status = fut.wait_for(0ms);
+    return status;
+}
+
 //ACCESS ONLY UNDER MUTEX (NOT THREAD SAFE)
 namespace Globals{
     std::map<std::string, std::function<void(std::string)>> Commands;
