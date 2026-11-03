@@ -8,45 +8,8 @@
 #include <chrono>
 #include <mutex>
 #include <sstream>
-
-std::future_status getFutureStatus(std::future<int>& fut) {
-    using namespace std::chrono_literals;
-    auto status = fut.wait_for(0ms);
-    return status;
-}
-
-template <typename Core>
-struct Process{
-    int (*func)(Core&)=nullptr;
-    int priority=1;
-    Core* c;
-    int launch(){
-        return func(*c);
-    }
-    std::future<int> launchAsync(){
-        return std::async(std::launch::async, func, std::ref(*c));
-    }
-    public:
-    Process(std::string path, Core& core):c(&core){
-        HMODULE sym=LoadLibraryA(path.c_str());
-        func=(int(*)(Core&))GetProcAddress(sym, "main");
-    }
-    Process(int (*f)(Core&), int p, Core& core):func(f), priority(p), c(&core){}
-};
-
-struct Core{
-    std::mutex procMutex;
-    std::vector<Process<Core>> processes;
-    Core()=default;
-    template<typename T>
-    std::future<int> addProcess(const T& proc){
-        std::lock_guard<std::mutex> lock(procMutex);
-        processes.emplace_back(proc);
-        auto& p=processes.back();
-        auto res=p.launchAsync();
-        return res;
-    }
-};
+#include "main.hpp"
+#include "internal.h"
 
 //ACCESS ONLY UNDER MUTEX (NOT THREAD SAFE)
 namespace Globals{
@@ -82,7 +45,7 @@ int SetTimer(std::vector<std::string> args, Core& core){
     }
     int seconds = std::stoi(args[0]);
     _secs = seconds;
-    Process timerProcess(timerFunction, 1, core);
+    Process timerProcess(timerFunction, 1, core, "Timer");
     timerFuture = core.addProcess(timerProcess);
     return 0;
 }
@@ -92,7 +55,7 @@ int Proctest(std::vector<std::string> args, Core& core){
     Process<Core> testProcess([](Core& core){
         std::cout<<"Hello from Proctest!"<<std::endl;
         return 0;
-    }, 1, core);
+    }, 1, core, "Proctest");
     core.addProcess(testProcess);
     return 0;
 }
@@ -107,6 +70,11 @@ int isTimerFinished(std::vector<std::string> args, Core& core) {
 }
 
 int main(){
+    DataBase db("filesystem.db");
+    if (db.attrs.find("main") == db.attrs.end()) {
+        std::vector<Ellement> mainElements;
+        db.AddMapEx("main", mainElements);
+    }
     {
         std::lock_guard<std::mutex> lock(Globals::CommandsMutex);
         Globals::Commands["sayhello"] = SayHello;
@@ -115,7 +83,6 @@ int main(){
         Globals::Commands["istimerfinished"] = static_cast<int(*)(std::vector<std::string>, Core&)>(isTimerFinished);
         Globals::Commands["proctest"] = static_cast<int(*)(std::vector<std::string>, Core&)>(Proctest);
     }
-    Core core;
     while (true){
         std::string name;
         std::string args;
