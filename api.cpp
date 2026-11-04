@@ -11,7 +11,11 @@ PROCESS GetProc(std::string name){
     throw std::runtime_error("No process named "+name);
 }
 
-std::future<int> run(std::string name){
+std::future<int> runAsync(std::string name){
+    return core->addProcessAsync(Process<Core>(name, *core, name));
+}
+
+int run(std::string name){
     return core->addProcess(Process<Core>(name, *core, name));
 }
 

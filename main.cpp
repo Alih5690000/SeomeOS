@@ -44,8 +44,8 @@ int SetTimer(std::vector<std::string> args, Core& core){
     }
     int seconds = std::stoi(args[0]);
     _secs = seconds;
-    Process timerProcess(timerFunction, 1, core, "Timer");
-    timerFuture = core.addProcess(timerProcess);
+    Process timerProcess(timerFunction, core, "Timer");
+    timerFuture = core.addProcessAsync(timerProcess);
     return 0;
 }
 
@@ -54,7 +54,7 @@ int Proctest(std::vector<std::string> args, Core& core){
     Process<Core> testProcess([](){
         std::cout<<"Hello from Proctest!"<<std::endl;
         return 0;
-    }, 1, core, "Proctest");
+    }, core, "Proctest");
     core.addProcess(testProcess);
     return 0;
 }
@@ -318,14 +318,36 @@ int isTimerFinished(std::vector<std::string> args, Core& core) {
     return 0;
 }
 
-std::future<int> runRes;
-
 int run(std::vector<std::string> args, Core& core){
     if (args.size()<1){
         std::cout << "Usage: run <file_name>" << std::endl;
         return -1;
     }
-    runRes=core.addProcess(Process<Core>(args[0], core, args[0]));
+    core.addProcess(Process<Core>(args[0], core, args[0]));
+    return 0;
+}
+
+int console(){
+    while (true){
+        std::string name;
+        std::string args;
+        std::cout<<"$user>";
+        std::cin>>name;
+        std::getline(std::cin, args);
+        std::lock_guard<std::mutex> lock(Globals::CommandsMutex);
+        if (Globals::Commands.find(name) != Globals::Commands.end()) {
+            std::vector<std::string> argList;
+            std::stringstream ss(args);
+            std::string arg;
+            while (ss >> arg) {
+                argList.push_back(arg);
+            }
+            Globals::Commands[name](argList, *core);
+        }
+        else{
+            std::cout<<"[Terminal] Command not found:"<<name<<std::endl;
+        }
+    }
     return 0;
 }
 
@@ -350,25 +372,6 @@ int main(){
         Globals::Commands["deletefile"] = static_cast<int(*)(std::vector<std::string>, Core&)>(DeleteFileFs);
         Globals::Commands["run"] = static_cast<int(*)(std::vector<std::string>, Core&)>(run);
     }
-    while (true){
-        std::string name;
-        std::string args;
-        std::cout<<"$user>";
-        std::cin>>name;
-        std::getline(std::cin, args);
-        std::lock_guard<std::mutex> lock(Globals::CommandsMutex);
-        if (Globals::Commands.find(name) != Globals::Commands.end()) {
-            std::vector<std::string> argList;
-            std::stringstream ss(args);
-            std::string arg;
-            while (ss >> arg) {
-                argList.push_back(arg);
-            }
-            Globals::Commands[name](argList, *core);
-        }
-        else{
-            std::cout<<"[Terminal] Command not found:"<<name<<std::endl;
-        }
-    }
+    core->addProcessAsync(Process<Core>(console, *core, "console"));
     return 0;
 }

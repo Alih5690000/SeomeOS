@@ -23,19 +23,32 @@ struct Process{
     Core* c;
     std::string name;
     int launch(){
-        return func(*c);
+        return func();
+    }
+    int launch() const{
+        return func();
     }
     std::future<int> launchAsync(){
         return std::async(std::launch::async, func);
     }
     public:
-    Process(std::string path, Core& core, std::string n):c(&core), name(n){
-        HMODULE sym=LoadLibraryA(path.c_str());
-        func=(int(*)())GetProcAddress(sym, "main");
-        auto f=(void(*)(void*))GetProcAddress(sym, "init");
-        f(core);
+    Process(std::string path, Core& core, std::string n)
+    : c(&core), name(n)
+    {
+        HMODULE sym = LoadLibraryA(path.c_str());
+
+        if (!sym)
+            throw std::runtime_error("Failed to load DLL");
+
+        func = (int(*)())GetProcAddress(sym, "main");
+        auto f = (void(*)(void*))GetProcAddress(sym, "init");
+
+        if (!func || !f)
+            throw std::runtime_error("DLL missing main or init export");
+
+        f(&core);
     }
-    Process(int (*f)(), int p, Core& core, std::string n):func(f), priority(p), c(&core), name(n){}
+    Process(int (*f)(), Core& core, std::string n):func(f), c(&core), name(n){}
 };
 
 struct Core{
@@ -43,13 +56,16 @@ struct Core{
     std::mutex procMutex;
     std::vector<Process<Core>> processes;
     Core()=default;
-    std::future<int> addProcess(const Process<Core>& proc){
+    std::future<int> addProcessAsync(const Process<Core>& proc){
         std::lock_guard<std::mutex> lock(procMutex);
         processes.emplace_back(proc);
         auto& p=processes.back();
         p.id = nextProcessId++;
         auto res=p.launchAsync();
         return res;
+    }
+    int addProcess(const Process<Core>& proc){
+        return proc.launch();
     }
     std::vector<Process<Core>> getProcesses(){
         std::lock_guard<std::mutex> lock(procMutex);
