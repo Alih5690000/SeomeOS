@@ -61,15 +61,57 @@ int Proctest(std::vector<std::string> args, Core& core){
 
 const std::string DIR_SUFFIX = "_DIR" + std::string('\x1F', 1);
 
-int MakeDir(std::vector<std::string> args, Core& core){
+int MakeDir(std::vector<std::string> args, Core& core) {
     if (args.size() < 1) {
         std::cout << "Usage: mkdir <directory_name>" << std::endl;
         return -1;
     }
-    std::string dirName = args[0];
-    Ellement dirEl(dirName+DIR_SUFFIX, {}, true);
-    FileSystem fs;
-    fs.WriteDataTo(dirEl.name, dirEl.data);
+
+    std::string path = args[0];
+    std::stringstream ss(path);
+    std::string segment;
+    std::vector<std::string> segments;
+
+    while (std::getline(ss, segment, '/')) {
+        if (!segment.empty()) {
+            segments.push_back(segment);
+        }
+    }
+
+    if (segments.empty()) {
+        std::cout << "Invalid path" << std::endl;
+        return -1;
+    }
+
+    Ellement dirEl(segments.back() + DIR_SUFFIX, {}, true);
+
+    if (segments.size() == 1) {
+        FileSystem fs;
+        fs.WriteDataTo(dirEl.name, dirEl.data);
+        fs.DumpToFile("filesystem.db");
+        return 0;
+    }
+
+    Map<Ellement> current =
+        FileSystem::db.ReadMapEx(segments[0]);
+
+    for (int i = 1; i < segments.size() - 1; i++) {
+        current = current.Get(segments[i]).GetMap();
+    }
+
+    current.Set(segments.back(), dirEl);
+
+    for (int i = segments.size() - 2; i > 0; i--) {
+        Map<Ellement> parent =
+            FileSystem::db.ReadMapEx(segments[i - 1]);
+
+        parent.Set(segments[i], Ellement{current, true});
+        current = parent;
+    }
+
+    FileSystem::db.AddMapEx(segments[0], current);
+    FileSystem().DumpToFile("filesystem.db");
+
     return 0;
 }
 
@@ -221,6 +263,7 @@ int main(){
         Globals::Commands["openfile"] = static_cast<int(*)(std::vector<std::string>, Core&)>(OpenFile);
         Globals::Commands["proctest"] = static_cast<int(*)(std::vector<std::string>, Core&)>(Proctest);
         Globals::Commands["writefs"] = static_cast<int(*)(std::vector<std::string>, Core&)>(WriteFs);
+        Globals::Commands["mkdir"] = static_cast<int(*)(std::vector<std::string>, Core&)>(MakeDir);
     }
     while (true){
         std::string name;
