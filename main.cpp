@@ -9,6 +9,7 @@
 #include <mutex>
 #include <sstream>
 #include "internal.h"
+#include "lang.h"
 
 //ACCESS ONLY UNDER MUTEX (NOT THREAD SAFE)
 namespace Globals{
@@ -112,6 +113,17 @@ int MakeDir(std::vector<std::string> args, Core& core) {
     FileSystem::db.AddMapEx(segments[0], current);
     FileSystem().DumpToFile("filesystem.db");
 
+    return 0;
+}
+
+int runCode(std::vector<std::string> args, Core& core){
+    if (args.empty()){
+        std::cout<<"Usage: runCode <filename>\n";
+        return -1;
+    }
+    auto c=FileSystem::db.attrs[args[0]];
+    Machine m;
+    m.exec(c);
     return 0;
 }
 
