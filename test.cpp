@@ -4,3 +4,5 @@
 __declspec(dllexport) int main(){
     std::cout<<"Hello from module"<<std::endl;
 }
+
+INIT

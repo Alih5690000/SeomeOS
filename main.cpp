@@ -325,13 +325,12 @@ int run(std::vector<std::string> args, Core& core){
         std::cout << "Usage: run <file_name>" << std::endl;
         return -1;
     }
-    runRes=core.addProcess(args[0]);
+    runRes=core.addProcess(Process<Core>(args[0], core, args[0]));
     return 0;
 }
 
-Core core;
-
 int main(){
+    core=new Core;
     if (FileSystem::db.attrs.find("inited") == FileSystem::db.attrs.end()) {
         FileSystem f;
         f.WriteDataTo("inited", std::vector<uint8_t>{1});
@@ -349,7 +348,7 @@ int main(){
         Globals::Commands["writefs"] = static_cast<int(*)(std::vector<std::string>, Core&)>(WriteFs);
         Globals::Commands["mkdir"] = static_cast<int(*)(std::vector<std::string>, Core&)>(MakeDir);
         Globals::Commands["deletefile"] = static_cast<int(*)(std::vector<std::string>, Core&)>(DeleteFileFs);
-        Globals::Commands["runs"] = static_cast<int(*)(std::vector<std::string>, Core&)>(run);
+        Globals::Commands["run"] = static_cast<int(*)(std::vector<std::string>, Core&)>(run);
     }
     while (true){
         std::string name;
@@ -365,7 +364,7 @@ int main(){
             while (ss >> arg) {
                 argList.push_back(arg);
             }
-            Globals::Commands[name](argList, core);
+            Globals::Commands[name](argList, *core);
         }
         else{
             std::cout<<"[Terminal] Command not found:"<<name<<std::endl;

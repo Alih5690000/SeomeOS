@@ -5,3 +5,5 @@ typedef long long PROCESS;
 
 PROCESS GetProc(std::string name);
 std::future<int> run(std::string name);
+void Init(void* p);
+#define INIT void init(void* a){Init(a);}

@@ -4,7 +4,7 @@
 #include "api.h"
 
 PROCESS GetProc(std::string name){
-    auto& p=core.processes;
+    auto& p=core->processes;
     for (int i=0;i<p.size();i++){
         if (p[i].name==name) return i;
     }
@@ -12,5 +12,9 @@ PROCESS GetProc(std::string name){
 }
 
 std::future<int> run(std::string name){
-    return core.addProcess(Process<Core>(name, core, name));
+    return core->addProcess(Process<Core>(name, *core, name));
+}
+
+void Init(void* p){
+    core=(Core*)p;
 }

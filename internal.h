@@ -32,6 +32,8 @@ struct Process{
     Process(std::string path, Core& core, std::string n):c(&core), name(n){
         HMODULE sym=LoadLibraryA(path.c_str());
         func=(int(*)())GetProcAddress(sym, "main");
+        auto f=(void(*)(void*))GetProcAddress(sym, "init");
+        f(core);
     }
     Process(int (*f)(), int p, Core& core, std::string n):func(f), priority(p), c(&core), name(n){}
 };
@@ -41,8 +43,7 @@ struct Core{
     std::mutex procMutex;
     std::vector<Process<Core>> processes;
     Core()=default;
-    template<typename T>
-    std::future<int> addProcess(const T& proc){
+    std::future<int> addProcess(const Process<Core>& proc){
         std::lock_guard<std::mutex> lock(procMutex);
         processes.emplace_back(proc);
         auto& p=processes.back();
@@ -77,4 +78,4 @@ struct FileSystem{
 
 DataBase FileSystem::db("filesystem.db");
 
-extern Core core;
+Core* core;
