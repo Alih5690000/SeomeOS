@@ -299,11 +299,6 @@ int OpenFile(std::vector<std::string> args, Core& core){
 
     Ellement file = current.Get(segments.back());
 
-    std::cout << "OpenFile log" << '\n';
-    std::cout << "Name: " << file.name << '\n';
-    std::cout << "Data size: " << file.data.size() << '\n';
-    std::cout << "Value: " << file.GetStr() << '\n';
-
     std::cout << file.GetStr() << std::endl;
 
     return 0;
