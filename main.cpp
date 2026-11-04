@@ -318,6 +318,8 @@ int isTimerFinished(std::vector<std::string> args, Core& core) {
     return 0;
 }
 
+Core core;
+
 int main(){
     if (FileSystem::db.attrs.find("inited") == FileSystem::db.attrs.end()) {
         FileSystem f;

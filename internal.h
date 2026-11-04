@@ -77,4 +77,4 @@ struct FileSystem{
 
 DataBase FileSystem::db("filesystem.db");
 
-__declspec(dllexport) Core core;
+extern Core core;
