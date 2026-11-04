@@ -17,7 +17,7 @@ std::future_status getFutureStatus(std::future<int>& fut) {
 
 template <typename Core>
 struct Process{
-    int (*func)(Core&)=nullptr;
+    int (*func)()=nullptr;
     int priority=1;
     unsigned long long  id;
     Core* c;
@@ -26,14 +26,14 @@ struct Process{
         return func(*c);
     }
     std::future<int> launchAsync(){
-        return std::async(std::launch::async, func, std::ref(*c));
+        return std::async(std::launch::async, func);
     }
     public:
     Process(std::string path, Core& core, std::string n):c(&core), name(n){
         HMODULE sym=LoadLibraryA(path.c_str());
-        func=(int(*)(Core&))GetProcAddress(sym, "main");
+        func=(int(*)())GetProcAddress(sym, "main");
     }
-    Process(int (*f)(Core&), int p, Core& core, std::string n):func(f), priority(p), c(&core), name(n){}
+    Process(int (*f)(), int p, Core& core, std::string n):func(f), priority(p), c(&core), name(n){}
 };
 
 struct Core{

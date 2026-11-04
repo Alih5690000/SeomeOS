@@ -29,7 +29,7 @@ int Leave(std::vector<std::string> args, Core& core){
 int _secs=0;
 bool _finished=false;
 
-int timerFunction(Core& core){
+int timerFunction(){
     std::this_thread::sleep_for(std::chrono::seconds(_secs));
     _finished = true;
     return 0;
@@ -51,7 +51,7 @@ int SetTimer(std::vector<std::string> args, Core& core){
 
 int Proctest(std::vector<std::string> args, Core& core){
     std::cout<<"Starting Proctest..."<<std::endl;
-    Process<Core> testProcess([](Core& core){
+    Process<Core> testProcess([](){
         std::cout<<"Hello from Proctest!"<<std::endl;
         return 0;
     }, 1, core, "Proctest");
@@ -318,6 +318,17 @@ int isTimerFinished(std::vector<std::string> args, Core& core) {
     return 0;
 }
 
+std::future<int> runRes;
+
+int run(std::vector<std::string> args, Core& core){
+    if (args.size()<1){
+        std::cout << "Usage: run <file_name>" << std::endl;
+        return -1;
+    }
+    runRes=core.addProcess(args[0]);
+    return 0;
+}
+
 Core core;
 
 int main(){
@@ -338,6 +349,7 @@ int main(){
         Globals::Commands["writefs"] = static_cast<int(*)(std::vector<std::string>, Core&)>(WriteFs);
         Globals::Commands["mkdir"] = static_cast<int(*)(std::vector<std::string>, Core&)>(MakeDir);
         Globals::Commands["deletefile"] = static_cast<int(*)(std::vector<std::string>, Core&)>(DeleteFileFs);
+        Globals::Commands["runs"] = static_cast<int(*)(std::vector<std::string>, Core&)>(run);
     }
     while (true){
         std::string name;

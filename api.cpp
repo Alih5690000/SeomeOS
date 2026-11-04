@@ -1,5 +1,6 @@
 #include "internal.h"
 #include <string>
+#include <future>
 #include "api.h"
 
 PROCESS GetProc(std::string name){
@@ -8,4 +9,8 @@ PROCESS GetProc(std::string name){
         if (p[i].name==name) return i;
     }
     throw std::runtime_error("No process named "+name);
+}
+
+std::future<int> run(std::string name){
+    return core.addProcess(Process<Core>(name, core, name));
 }
