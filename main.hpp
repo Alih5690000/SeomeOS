@@ -30,10 +30,10 @@ class Map{
         for (auto& i:v){
             if (i.name==n){ 
                 i=e;
-                return;
             }
         }
-        throw std::runtime_error("[SetByName]:Couldnt find key "+n);
+        e.name=n;
+        v.push_back(e);
     }
 };
 

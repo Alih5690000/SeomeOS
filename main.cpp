@@ -115,6 +115,70 @@ int MakeDir(std::vector<std::string> args, Core& core) {
     return 0;
 }
 
+int DeleteFileFs(std::vector<std::string> args, Core& core) {
+    if (args.empty()) {
+        std::cout << "Usage: deletefile <path>\n";
+        return -1;
+    }
+
+    std::vector<std::string> segments;
+    std::stringstream ss(args[0]);
+    std::string part;
+
+    while (std::getline(ss, part, '/')) {
+        if (!part.empty())
+            segments.push_back(part);
+    }
+
+    if (segments.empty())
+        return -1;
+
+    auto eraseFromMap = [](Map<Ellement>& map, const std::string& name) {
+        auto& v = map.v;
+
+        v.erase(
+            std::remove_if(v.begin(), v.end(),
+                [&](const Ellement& el) {
+                    return el.name == name;
+                }),
+            v.end()
+        );
+    };
+
+    // Root-level entry
+    if (segments.size() == 1) {
+        FileSystem::db.attrs.erase(segments[0]);
+
+        FileSystem().DumpToFile("filesystem.db");
+        return 0;
+    }
+
+    // Find the parent directory
+    Map<Ellement> current =
+        FileSystem::db.ReadMapEx(segments[0]);
+
+    for (int i = 1; i < segments.size() - 1; i++) {
+        current = current.Get(segments[i]).GetMap();
+    }
+
+    // Delete the target
+    eraseFromMap(current, segments.back());
+
+    // Propagate modified maps back to the root
+    for (int i = static_cast<int>(segments.size()) - 2; i > 0; i--) {
+        Map<Ellement> parent =
+            FileSystem::db.ReadMapEx(segments[i - 1]);
+
+        parent.Set(segments[i], Ellement{current, true});
+        current = parent;
+    }
+
+    FileSystem::db.AddMapEx(segments[0], current);
+
+    FileSystem().DumpToFile("filesystem.db");
+    return 0;
+}
+
 int WriteFs(std::vector<std::string> args, Core& core) {
     if (args.size() < 2) {
         std::cout << "Usage: writefs <file_name> <content>" << std::endl;
@@ -183,10 +247,12 @@ int SaveFile(std::vector<std::string> args, Core& core){
         current=current.Get(segments[i]).GetMap();
     }
     current.Set(segments.back(), Ellement{""});
-    for (int i=segments.size()-1;i>0;i--){
-        Map m=FileSystem::db.ReadMapEx(segments[i-1]);
-        m.Set(segments[i], Ellement{current, true});
-        current=m;
+    if (segments.size() > 2) {
+        for (int i = segments.size()-2; i > 0; i--) {
+            Map m = FileSystem::db.ReadMapEx(segments[i-1]);
+            m.Set(segments[i], Ellement{current, true});
+            current = m;
+        }
     }
     FileSystem::db.AddMapEx(segments[0], current);
     FileSystem().DumpToFile("filesystem.db");
@@ -233,6 +299,11 @@ int OpenFile(std::vector<std::string> args, Core& core){
 
     Ellement file = current.Get(segments.back());
 
+    std::cout << "OpenFile log" << '\n';
+    std::cout << "Name: " << file.name << '\n';
+    std::cout << "Data size: " << file.data.size() << '\n';
+    std::cout << "Value: " << file.GetStr() << '\n';
+
     std::cout << file.GetStr() << std::endl;
 
     return 0;
@@ -264,6 +335,7 @@ int main(){
         Globals::Commands["proctest"] = static_cast<int(*)(std::vector<std::string>, Core&)>(Proctest);
         Globals::Commands["writefs"] = static_cast<int(*)(std::vector<std::string>, Core&)>(WriteFs);
         Globals::Commands["mkdir"] = static_cast<int(*)(std::vector<std::string>, Core&)>(MakeDir);
+        Globals::Commands["deletefile"] = static_cast<int(*)(std::vector<std::string>, Core&)>(DeleteFileFs);
     }
     while (true){
         std::string name;
