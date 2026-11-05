@@ -5,8 +5,8 @@
 #include <cstring>
 #include <map>
 #ifdef DEBUG
-#define LOG(x) std::cout<<x<<std::endl;
-#else 
+#define LOG(x) std::cout << x << std::endl;
+#else
 #define LOG(x)
 #endif
 
@@ -28,7 +28,8 @@ enum class COMMANDS
     PUSH,
     POP,
     REG_TO_BUFF,
-    BUFF_TO_REG
+    BUFF_TO_REG,
+    APPEND_REG
 };
 
 class Machine
@@ -179,6 +180,29 @@ public:
                 i += sizeof(uint32_t);
                 stack.push_back(reg[len]);
             }
+            else if (arr[i] == (uint8_t)COMMANDS::APPEND_REG)
+            {
+                if (arr.size() - i - 1 < 8)
+                    throw std::runtime_error("Invalid APPEND_REG instruction");
+
+                i++;
+
+                uint32_t dest, src;
+
+                memcpy(&dest, arr.data() + i, sizeof(uint32_t));
+                i += 4;
+
+                memcpy(&src, arr.data() + i, sizeof(uint32_t));
+                i += 3;
+
+                if (dest >= reg.size() || src >= reg.size())
+                    throw std::runtime_error("Invalid register index");
+
+                reg[dest].insert(
+                    reg[dest].end(),
+                    reg[src].begin(),
+                    reg[src].end());
+            }
             else if (arr[i] == (uint8_t)COMMANDS::REG_TO_BUFF)
             {
                 LOG("[REG_TO_BUFF]");
@@ -187,18 +211,20 @@ public:
                 uint32_t len;
                 i++;
                 memcpy(&len, arr.data() + i, sizeof(uint32_t));
-                i += sizeof(uint32_t)-1;
-                LOG("[REG_TO_BUFF]:DATA AT REG "+std::to_string(len));
-                for (auto i:reg[len]){
-                    LOG((char)i<<' ');
+                i += sizeof(uint32_t) - 1;
+                LOG("[REG_TO_BUFF]:DATA AT REG " + std::to_string(len));
+                for (auto i : reg[len])
+                {
+                    LOG((char)i << ' ');
                 }
-                std::cout<<std::endl;
+                std::cout << std::endl;
                 buff = reg[len];
                 LOG("[REG_TO_BUFF]:DATA AT BUFF");
-                for (auto i:buff){
-                    LOG((char)i<<' ');
+                for (auto i : buff)
+                {
+                    LOG((char)i << ' ');
                 }
-                std::cout<<std::endl;
+                std::cout << std::endl;
             }
             else if (arr[i] == (uint8_t)COMMANDS::BUFF_TO_REG)
             {
