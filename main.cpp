@@ -60,8 +60,6 @@ int Proctest(std::vector<std::string> args, Core& core){
     return 0;
 }
 
-const std::string DIR_SUFFIX = "_DIR" + std::string('\x1F', 1);
-
 int MakeDir(std::vector<std::string> args, Core& core) {
     if (args.size() < 1) {
         std::cout << "Usage: mkdir <directory_name>" << std::endl;
@@ -84,7 +82,7 @@ int MakeDir(std::vector<std::string> args, Core& core) {
         return -1;
     }
 
-    Ellement dirEl(segments.back() + DIR_SUFFIX, {}, true);
+    Ellement dirEl(segments.back(), {}, true);
 
     if (segments.size() == 1) {
         FileSystem fs;
@@ -365,6 +363,10 @@ int main(){
         f.WriteDataTo("inited", std::vector<uint8_t>{1});
         f.DumpToFile("filesystem.db");
     }
+    std::vector<std::uint8_t> coms={
+        (uint8_t)COMMANDS::BUFF, SPLIT_U32(3), 'O', 'K', '\n', (uint8_t)COMMANDS::PRINT
+    };
+    FileSystem::db.attrs["code.cd"]=coms;
     {
         std::lock_guard<std::mutex> lock(Globals::CommandsMutex);
         Globals::Commands["sayhello"] = SayHello;
@@ -378,6 +380,7 @@ int main(){
         Globals::Commands["mkdir"] = static_cast<int(*)(std::vector<std::string>, Core&)>(MakeDir);
         Globals::Commands["deletefile"] = static_cast<int(*)(std::vector<std::string>, Core&)>(DeleteFileFs);
         Globals::Commands["run"] = static_cast<int(*)(std::vector<std::string>, Core&)>(run);
+        Globals::Commands["runCode"] = static_cast<int(*)(std::vector<std::string>, Core&)>(runCode);
     }
     core->addProcessAsync(Process<Core>(console, *core, "console"));
     return 0;
