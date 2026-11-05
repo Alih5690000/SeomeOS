@@ -34,13 +34,17 @@ enum class COMMANDS
     JMP,
     ADD,
     SUB,
+    GREATER,
+    LESS,
+    EQUAL,
     REG,
     PUSH,
     POP,
     REG_TO_BUFF,
     BUFF_TO_REG,
     APPEND_REG,
-    CALL
+    CALL,
+    JMP_IF
 };
 
 class Machine
@@ -265,7 +269,7 @@ public:
             else if (arr[i] == (uint8_t)COMMANDS::BUFF_TO_REG)
             {
                 if (i + 4 >= arr.size())
-                    throw std::runtime_error("Invalid REG_TO_BUFF instruction");
+                    throw std::runtime_error("Invalid BUFF_TO_REG instruction");
                 uint32_t len;
                 i++;
                 memcpy(&len, arr.data() + i, sizeof(uint32_t));
@@ -334,6 +338,36 @@ public:
                     throw std::runtime_error("Didnt find JMP destination");
                 }
             }
+            else if (arr[i] == (uint8_t)COMMANDS::JMP_IF)
+            {
+                uint32_t len;
+                uint32_t num;
+                i++;
+                memcpy(&len, arr.data() + i, sizeof(uint32_t));
+                i += sizeof(uint32_t);
+                memcpy(&num, arr.data() + i, sizeof(uint32_t));
+                i += sizeof(uint32_t);
+                if (len > arr.size() - i)
+                    throw std::runtime_error("Invalid JMP destination");
+                std::string res;
+                res.resize(len);
+                memcpy(res.data(), arr.data() + i, len);
+                i += len;
+                uint32_t n;
+                memcpy(&n, reg[num].data(), sizeof(uint32_t));
+                if (!n){
+                    i--;
+                    continue;
+                }
+                if (points.find(res) != points.end())
+                {
+                    i = points[res] - 1;
+                }
+                else
+                {
+                    throw std::runtime_error("Didnt find JMP destination");
+                }
+            }
             else if (arr[i] == (uint8_t)COMMANDS::ADD)
             {
                 uint32_t first = *((uint32_t *)reg[0].data());
@@ -348,6 +382,33 @@ public:
                 uint32_t first = *((uint32_t *)reg[0].data());
                 uint32_t second = *((uint32_t *)reg[1].data());
                 uint32_t res = first - second;
+                reg[0].clear();
+                reg[0].resize(sizeof(uint32_t));
+                memcpy(reg[0].data(), &res, sizeof(uint32_t));
+            }
+            else if (arr[i] == (uint8_t)COMMANDS::GREATER)
+            {
+                uint32_t first = *((uint32_t *)reg[0].data());
+                uint32_t second = *((uint32_t *)reg[1].data());
+                uint32_t res = first>second;
+                reg[0].clear();
+                reg[0].resize(sizeof(uint32_t));
+                memcpy(reg[0].data(), &res, sizeof(uint32_t));
+            }
+            else if (arr[i] == (uint8_t)COMMANDS::LESS)
+            {
+                uint32_t first = *((uint32_t *)reg[0].data());
+                uint32_t second = *((uint32_t *)reg[1].data());
+                uint32_t res = first<second;
+                reg[0].clear();
+                reg[0].resize(sizeof(uint32_t));
+                memcpy(reg[0].data(), &res, sizeof(uint32_t));
+            }
+            else if (arr[i] == (uint8_t)COMMANDS::EQUAL)
+            {
+                uint32_t first = *((uint32_t *)reg[0].data());
+                uint32_t second = *((uint32_t *)reg[1].data());
+                uint32_t res = first==second;
                 reg[0].clear();
                 reg[0].resize(sizeof(uint32_t));
                 memcpy(reg[0].data(), &res, sizeof(uint32_t));
