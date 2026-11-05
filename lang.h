@@ -16,6 +16,16 @@
         (uint8_t)(((x) >> 16) & 0xFF), \
         (uint8_t)(((x) >> 24) & 0xFF)
 
+#define SPLIT_U64(x)                   \
+    (uint8_t)((x) & 0xFF),             \
+        (uint8_t)(((x) >> 8) & 0xFF),  \
+        (uint8_t)(((x) >> 16) & 0xFF), \
+        (uint8_t)(((x) >> 24) & 0xFF), \
+        (uint8_t)(((x) >> 32) & 0xFF), \
+        (uint8_t)(((x) >> 40) & 0xFF), \
+        (uint8_t)(((x) >> 48) & 0xFF), \
+        (uint8_t)(((x) >> 56) & 0xFF)
+
 enum class COMMANDS
 {
     PRINT,
@@ -29,7 +39,8 @@ enum class COMMANDS
     POP,
     REG_TO_BUFF,
     BUFF_TO_REG,
-    APPEND_REG
+    APPEND_REG,
+    CALL
 };
 
 class Machine
@@ -43,103 +54,116 @@ public:
     {
         reg.resize(256);
     }
-    void cache(std::vector<std::uint8_t> arr)
+    void cache(const std::vector<uint8_t> &arr)
     {
         points.clear();
 
-        for (std::size_t i = 0; i < arr.size(); i++)
+        std::size_t i = 0;
+
+        auto readU32 = [&]() -> uint32_t
         {
+            if (arr.size() - i < sizeof(uint32_t))
+                throw std::runtime_error("Invalid instruction");
 
-            if (arr[i] == (uint8_t)COMMANDS::BUFF ||
-                arr[i] == (uint8_t)COMMANDS::PUSH ||
-                arr[i] == (uint8_t)COMMANDS::POP ||
-                arr[i] == (uint8_t)COMMANDS::REG_TO_BUFF ||
-                arr[i] == (uint8_t)COMMANDS::BUFF_TO_REG)
+            uint32_t value;
+            memcpy(&value, arr.data() + i, sizeof(value));
+            i += sizeof(value);
+            return value;
+        };
+
+        auto skip = [&](std::size_t len, const char *error)
+        {
+            if (len > arr.size() - i)
+                throw std::runtime_error(error);
+
+            i += len;
+        };
+
+        while (i < arr.size())
+        {
+            COMMANDS cmd = (COMMANDS)arr[i++];
+
+            switch (cmd)
             {
+            case COMMANDS::PRINT:
+            case COMMANDS::ADD:
+            case COMMANDS::SUB:
+                break;
 
-                if (arr.size() - i - 1 < 4)
-                    throw std::runtime_error("Invalid instruction");
-
-                uint32_t num;
-                i++;
-                memcpy(&num, arr.data() + i, 4);
-                i += 4;
-
-                // BUFF contains raw data.
-                if (arr[i - 5] == (uint8_t)COMMANDS::BUFF)
-                {
-                    if (num > arr.size() - i)
-                        throw std::runtime_error("Invalid BUFF data");
-
-                    if (num > 0)
-                        i += num - 1;
-                }
+            case COMMANDS::BUFF:
+            {
+                uint32_t len = readU32();
+                skip(len, "Invalid BUFF data");
+                break;
             }
 
-            else if (arr[i] == (uint8_t)COMMANDS::REG)
+            case COMMANDS::REG:
             {
-                if (arr.size() - i - 1 < 8)
-                    throw std::runtime_error("Invalid REG instruction");
+                uint32_t regIndex = readU32();
+                uint32_t len = readU32();
 
-                i++;
-
-                uint32_t num, len;
-
-                memcpy(&num, arr.data() + i, 4);
-                i += 4;
-
-                memcpy(&len, arr.data() + i, 4);
-                i += 4;
-
-                if (num >= reg.size())
+                if (regIndex >= reg.size())
                     throw std::runtime_error("Invalid register index");
 
-                if (len > arr.size() - i)
-                    throw std::runtime_error("Invalid REG data");
-
-                if (len > 0)
-                    i += len - 1;
+                skip(len, "Invalid REG data");
+                break;
             }
 
-            else if (arr[i] == (uint8_t)COMMANDS::POINT)
+            case COMMANDS::PUSH:
+            case COMMANDS::POP:
+            case COMMANDS::REG_TO_BUFF:
+            case COMMANDS::BUFF_TO_REG:
             {
-                if (arr.size() - i - 1 < 4)
-                    throw std::runtime_error("Invalid POINT instruction");
+                uint32_t regIndex = readU32();
 
-                i++;
+                if (regIndex >= reg.size())
+                    throw std::runtime_error("Invalid register index");
 
-                uint32_t len;
-                memcpy(&len, arr.data() + i, 4);
-                i += 4;
+                break;
+            }
+
+            case COMMANDS::APPEND_REG:
+            {
+                uint32_t dest = readU32();
+                uint32_t src = readU32();
+
+                if (dest >= reg.size() || src >= reg.size())
+                    throw std::runtime_error("Invalid register index");
+
+                break;
+            }
+
+            case COMMANDS::CALL:
+            {
+                skip(sizeof(ptrdiff_t), "Invalid CALL instruction");
+                break;
+            }
+
+            case COMMANDS::POINT:
+            {
+                uint32_t len = readU32();
 
                 if (len > arr.size() - i)
                     throw std::runtime_error("Invalid POINT name");
 
-                std::string res(len, '\0');
-                memcpy(res.data(), arr.data() + i, len);
+                std::string name(
+                    reinterpret_cast<const char *>(arr.data() + i),
+                    len);
 
-                if (len > 0)
-                    i += len - 1;
-
-                points[res] = i + 1;
+                i += len;
+                points[name] = (int)i;
+                break;
             }
 
-            else if (arr[i] == (uint8_t)COMMANDS::JMP)
+            case COMMANDS::JMP:
             {
-                if (arr.size() - i - 1 < 4)
-                    throw std::runtime_error("Invalid JMP instruction");
+                uint32_t len = readU32();
+                skip(len, "Invalid JMP destination");
+                break;
+            }
 
-                i++;
-
-                uint32_t len;
-                memcpy(&len, arr.data() + i, 4);
-                i += 4;
-
-                if (len > arr.size() - i)
-                    throw std::runtime_error("Invalid JMP destination");
-
-                if (len > 0)
-                    i += len - 1;
+            default:
+                throw std::runtime_error("Unknown instruction");
             }
         }
     }
@@ -169,6 +193,18 @@ public:
                 buff.resize(len);
                 memcpy(buff.data(), arr.data() + i, len);
                 i += len - 1;
+            }
+            else if (arr[i] == (uint8_t)COMMANDS::CALL)
+            {
+                LOG("[CALL]");
+                if (i + 4 >= arr.size())
+                    throw std::runtime_error("Invalid BUFF instruction");
+                ptrdiff_t len;
+                i++;
+                memcpy(&len, arr.data() + i, sizeof(ptrdiff_t));
+                i += sizeof(ptrdiff_t)-1;
+                void (*f)() = (void (*)())len;
+                f();
             }
             else if (arr[i] == (uint8_t)COMMANDS::PUSH)
             {
