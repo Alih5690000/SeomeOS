@@ -40,11 +40,13 @@ enum class COMMANDS
     REG,
     PUSH,
     POP,
+    RUN,
     REG_TO_BUFF,
     BUFF_TO_REG,
     APPEND_REG,
     CALL,
-    JMP_IF
+    JMP_IF,
+    JMP_IF_NOT
 };
 
 class Machine
@@ -54,10 +56,12 @@ public:
     std::vector<std::vector<std::uint8_t>> stack;
     std::vector<std::vector<std::uint8_t>> reg;
     std::map<std::string, int> points;
+    std::vector<uint8_t> ret;
     Machine()
     {
         reg.resize(256);
     }
+
     void cache(const std::vector<uint8_t> &arr)
     {
         points.clear();
@@ -92,6 +96,9 @@ public:
             case COMMANDS::PRINT:
             case COMMANDS::ADD:
             case COMMANDS::SUB:
+            case COMMANDS::GREATER:
+            case COMMANDS::LESS:
+            case COMMANDS::EQUAL:
                 break;
 
             case COMMANDS::BUFF:
@@ -155,7 +162,7 @@ public:
                     len);
 
                 i += len;
-                points[name] = (int)i;
+                points[name] = static_cast<int>(i);
                 break;
             }
 
@@ -166,15 +173,30 @@ public:
                 break;
             }
 
+            case COMMANDS::JMP_IF:
+            case COMMANDS::JMP_IF_NOT:
+            {
+                uint32_t len = readU32();
+                uint32_t regIndex = readU32();
+
+                if (regIndex >= reg.size())
+                    throw std::runtime_error("Invalid register index");
+
+                skip(len, "Invalid conditional JMP destination");
+                break;
+            }
+
             default:
                 throw std::runtime_error("Unknown instruction");
             }
         }
     }
+
     void exec(std::vector<std::uint8_t> arr)
     {
         for (int i = 0; i < arr.size(); i++)
         {
+            LOG("Current is "+std::to_string(arr[i]));
             if (arr[i] == (uint8_t)COMMANDS::PRINT)
             {
                 std::string str;
@@ -206,9 +228,29 @@ public:
                 ptrdiff_t len;
                 i++;
                 memcpy(&len, arr.data() + i, sizeof(ptrdiff_t));
-                i += sizeof(ptrdiff_t)-1;
+                i += sizeof(ptrdiff_t) - 1;
                 void (*f)() = (void (*)())len;
                 f();
+            }
+            else if (arr[i] == (uint8_t)COMMANDS::RUN)
+            {
+                LOG("[CALL]");
+                if (i + 4 >= arr.size())
+                    throw std::runtime_error("Invalid BUFF instruction");
+                ptrdiff_t len;
+                uint32_t reallen;
+                i++;
+                memcpy(&len, arr.data() + i, sizeof(ptrdiff_t));
+                i += sizeof(ptrdiff_t);
+                memcpy(&len, arr.data() + i, sizeof(uint32_t));
+                i += sizeof(uint32_t) -1;
+                std::vector<uint8_t> v;
+                v.resize(reallen);
+                memcpy(v.data(), (void*)len, reallen);
+                Machine ma;
+                ma.exec(v);
+                ret=ma.ret;
+                
             }
             else if (arr[i] == (uint8_t)COMMANDS::PUSH)
             {
@@ -355,7 +397,39 @@ public:
                 i += len;
                 uint32_t n;
                 memcpy(&n, reg[num].data(), sizeof(uint32_t));
-                if (!n){
+                if (!n)
+                {
+                    i--;
+                    continue;
+                }
+                if (points.find(res) != points.end())
+                {
+                    i = points[res] - 1;
+                }
+                else
+                {
+                    throw std::runtime_error("Didnt find JMP destination");
+                }
+            }
+            else if (arr[i] == (uint8_t)COMMANDS::JMP_IF_NOT)
+            {
+                uint32_t len;
+                uint32_t num;
+                i++;
+                memcpy(&len, arr.data() + i, sizeof(uint32_t));
+                i += sizeof(uint32_t);
+                memcpy(&num, arr.data() + i, sizeof(uint32_t));
+                i += sizeof(uint32_t);
+                if (len > arr.size() - i)
+                    throw std::runtime_error("Invalid JMP destination");
+                std::string res;
+                res.resize(len);
+                memcpy(res.data(), arr.data() + i, len);
+                i += len;
+                uint32_t n;
+                memcpy(&n, reg[num].data(), sizeof(uint32_t));
+                if (n)
+                {
                     i--;
                     continue;
                 }
@@ -390,7 +464,7 @@ public:
             {
                 uint32_t first = *((uint32_t *)reg[0].data());
                 uint32_t second = *((uint32_t *)reg[1].data());
-                uint32_t res = first>second;
+                uint32_t res = first > second;
                 reg[0].clear();
                 reg[0].resize(sizeof(uint32_t));
                 memcpy(reg[0].data(), &res, sizeof(uint32_t));
@@ -399,7 +473,7 @@ public:
             {
                 uint32_t first = *((uint32_t *)reg[0].data());
                 uint32_t second = *((uint32_t *)reg[1].data());
-                uint32_t res = first<second;
+                uint32_t res = first < second;
                 reg[0].clear();
                 reg[0].resize(sizeof(uint32_t));
                 memcpy(reg[0].data(), &res, sizeof(uint32_t));
@@ -408,7 +482,7 @@ public:
             {
                 uint32_t first = *((uint32_t *)reg[0].data());
                 uint32_t second = *((uint32_t *)reg[1].data());
-                uint32_t res = first==second;
+                uint32_t res = first == second;
                 reg[0].clear();
                 reg[0].resize(sizeof(uint32_t));
                 memcpy(reg[0].data(), &res, sizeof(uint32_t));
