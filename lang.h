@@ -46,7 +46,9 @@ enum class COMMANDS
     APPEND_REG,
     CALL,
     JMP_IF,
-    JMP_IF_NOT
+    JMP_IF_NOT,
+    RET_TO_REG,
+    REG_TO_REG
 };
 
 class Machine
@@ -76,6 +78,7 @@ public:
             uint32_t value;
             memcpy(&value, arr.data() + i, sizeof(value));
             i += sizeof(value);
+
             return value;
         };
 
@@ -93,6 +96,7 @@ public:
 
             switch (cmd)
             {
+            // No operands
             case COMMANDS::PRINT:
             case COMMANDS::ADD:
             case COMMANDS::SUB:
@@ -101,6 +105,7 @@ public:
             case COMMANDS::EQUAL:
                 break;
 
+            // uint32 length + data
             case COMMANDS::BUFF:
             {
                 uint32_t len = readU32();
@@ -108,6 +113,7 @@ public:
                 break;
             }
 
+            // uint32 register + uint32 length + data
             case COMMANDS::REG:
             {
                 uint32_t regIndex = readU32();
@@ -120,10 +126,12 @@ public:
                 break;
             }
 
+            // One register index
             case COMMANDS::PUSH:
             case COMMANDS::POP:
             case COMMANDS::REG_TO_BUFF:
             case COMMANDS::BUFF_TO_REG:
+            case COMMANDS::RET_TO_REG:
             {
                 uint32_t regIndex = readU32();
 
@@ -133,7 +141,9 @@ public:
                 break;
             }
 
+            // Two register indices
             case COMMANDS::APPEND_REG:
+            case COMMANDS::REG_TO_REG:
             {
                 uint32_t dest = readU32();
                 uint32_t src = readU32();
@@ -144,12 +154,28 @@ public:
                 break;
             }
 
+            // Native function address
             case COMMANDS::CALL:
             {
                 skip(sizeof(ptrdiff_t), "Invalid CALL instruction");
                 break;
             }
 
+            // Memory address + data length
+            case COMMANDS::RUN:
+            {
+                skip(sizeof(ptrdiff_t), "Invalid RUN address");
+
+                uint32_t len = readU32();
+
+                // RUN references external memory, so there is no
+                // bytecode payload to skip here.
+                (void)len;
+
+                break;
+            }
+
+            // Label declaration
             case COMMANDS::POINT:
             {
                 uint32_t len = readU32();
@@ -162,10 +188,15 @@ public:
                     len);
 
                 i += len;
+
+                if (points.find(name) != points.end())
+                    throw std::runtime_error("Duplicate POINT: " + name);
+
                 points[name] = static_cast<int>(i);
                 break;
             }
 
+            // Unconditional jump
             case COMMANDS::JMP:
             {
                 uint32_t len = readU32();
@@ -173,6 +204,7 @@ public:
                 break;
             }
 
+            // Conditional jumps
             case COMMANDS::JMP_IF:
             case COMMANDS::JMP_IF_NOT:
             {
@@ -187,7 +219,9 @@ public:
             }
 
             default:
-                throw std::runtime_error("Unknown instruction");
+                throw std::runtime_error(
+                    "Unknown instruction at offset " +
+                    std::to_string(i - 1));
             }
         }
     }
@@ -196,7 +230,7 @@ public:
     {
         for (int i = 0; i < arr.size(); i++)
         {
-            LOG("Current is "+std::to_string(arr[i]));
+            LOG("Current is " + std::to_string(arr[i]));
             if (arr[i] == (uint8_t)COMMANDS::PRINT)
             {
                 std::string str;
@@ -219,6 +253,16 @@ public:
                 buff.resize(len);
                 memcpy(buff.data(), arr.data() + i, len);
                 i += len - 1;
+            }
+            else if (arr[i] == (uint8_t)COMMANDS::RET_TO_REG)
+            {
+                if (i + 4 >= arr.size())
+                    throw std::runtime_error("Invalid BUFF instruction");
+                uint32_t len;
+                i++;
+                memcpy(&len, arr.data() + i, sizeof(uint32_t));
+                i += sizeof(uint32_t);
+                reg[len] = ret;
             }
             else if (arr[i] == (uint8_t)COMMANDS::CALL)
             {
@@ -243,14 +287,27 @@ public:
                 memcpy(&len, arr.data() + i, sizeof(ptrdiff_t));
                 i += sizeof(ptrdiff_t);
                 memcpy(&len, arr.data() + i, sizeof(uint32_t));
-                i += sizeof(uint32_t) -1;
+                i += sizeof(uint32_t) - 1;
                 std::vector<uint8_t> v;
                 v.resize(reallen);
-                memcpy(v.data(), (void*)len, reallen);
+                memcpy(v.data(), (void *)len, reallen);
                 Machine ma;
                 ma.exec(v);
-                ret=ma.ret;
-                
+                ret = ma.ret;
+            }
+            else if (arr[i] == (uint8_t)COMMANDS::RUN)
+            {
+                LOG("[CALL]");
+                if (i + 4 >= arr.size())
+                    throw std::runtime_error("Invalid BUFF instruction");
+                ptrdiff_t len;
+                uint32_t reallen;
+                i++;
+                memcpy(&len, arr.data() + i, sizeof(ptrdiff_t));
+                i += sizeof(ptrdiff_t);
+                memcpy(&len, arr.data() + i, sizeof(uint32_t));
+                i += sizeof(uint32_t) - 1;
+                reg[len] = reg[reallen];
             }
             else if (arr[i] == (uint8_t)COMMANDS::PUSH)
             {
