@@ -49,7 +49,8 @@ enum class COMMANDS
     JMP_IF_NOT,
     RET_TO_REG,
     REG_TO_RET,
-    REG_TO_REG
+    REG_TO_REG,
+    REG_TO_ARG
 };
 
 class Machine
@@ -58,11 +59,13 @@ public:
     std::vector<std::uint8_t> buff;
     std::vector<std::vector<std::uint8_t>> stack;
     std::vector<std::vector<std::uint8_t>> reg;
+    std::vector<std::vector<std::uint8_t>> args;
     std::map<std::string, int> points;
     std::vector<uint8_t> ret;
     Machine()
     {
         reg.resize(256);
+        args.resize(256);
     }
 
     void cache(const std::vector<uint8_t> &arr)
@@ -292,7 +295,7 @@ public:
             {
                 LOG("[CALL]");
                 if (i + 4 >= arr.size())
-                    throw std::runtime_error("Invalid BUFF instruction");
+                    throw std::runtime_error("Invalid RUN instruction");
                 ptrdiff_t len;
                 uint32_t reallen;
                 i++;
@@ -304,8 +307,22 @@ public:
                 v.resize(reallen);
                 memcpy(v.data(), (void *)len, reallen);
                 Machine ma;
+                ma.args=args;
                 ma.exec(v);
                 ret = ma.ret;
+            }
+            else if (arr[i] == (uint8_t)COMMANDS::REG_TO_ARG)
+            {
+                if (i + 4 >= arr.size())
+                    throw std::runtime_error("Invalid REG_TO_ARG instruction");
+                ptrdiff_t len;
+                uint32_t reallen;
+                i++;
+                memcpy(&len, arr.data() + i, sizeof(ptrdiff_t));
+                i += sizeof(ptrdiff_t);
+                memcpy(&len, arr.data() + i, sizeof(uint32_t));
+                i += sizeof(uint32_t) - 1;
+                args[reallen]=reg[len];
             }
             else if (arr[i] == (uint8_t)COMMANDS::RUN)
             {
