@@ -148,6 +148,7 @@ public:
 
             // Two register indices
             case COMMANDS::APPEND_REG:
+            case COMMANDS::REG_TO_ARG
             case COMMANDS::REG_TO_REG:
             {
                 uint32_t dest = readU32();
@@ -315,7 +316,7 @@ public:
             {
                 if (i + 4 >= arr.size())
                     throw std::runtime_error("Invalid REG_TO_ARG instruction");
-                ptrdiff_t len;
+                uint32_t len;
                 uint32_t reallen;
                 i++;
                 memcpy(&len, arr.data() + i, sizeof(ptrdiff_t));
