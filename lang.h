@@ -319,8 +319,8 @@ public:
                 uint32_t len;
                 uint32_t reallen;
                 i++;
-                memcpy(&len, arr.data() + i, sizeof(ptrdiff_t));
-                i += sizeof(ptrdiff_t);
+                memcpy(&len, arr.data() + i, sizeof(uint32_t));
+                i += sizeof(uint32_t);
                 memcpy(&len, arr.data() + i, sizeof(uint32_t));
                 i += sizeof(uint32_t) - 1;
                 args[reallen]=reg[len];
