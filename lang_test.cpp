@@ -4,7 +4,7 @@
 
 Machine m;
 
-void transaletToStr(){
+void transaletToStr(Machine& ma){
     uint32_t num=*(uint32_t*)m.reg[0].data();
     LOG("[transaltor]:num is "+std::to_string(num));
     std::string str=std::to_string((int)num);

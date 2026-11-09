@@ -40,6 +40,8 @@ enum class COMMANDS
     REG,
     PUSH,
     POP,
+    POP_EX,
+    PEEK_STACK,
     RUN,
     REG_TO_BUFF,
     BUFF_TO_REG,
@@ -148,7 +150,9 @@ public:
 
             // Two register indices
             case COMMANDS::APPEND_REG:
-            case COMMANDS::REG_TO_ARG
+            case COMMANDS::REG_TO_ARG:
+            case COMMANDS::POP_EX:
+            case COMMANDS::PEEK_STACK:
             case COMMANDS::REG_TO_REG:
             {
                 uint32_t dest = readU32();
@@ -289,8 +293,8 @@ public:
                 i++;
                 memcpy(&len, arr.data() + i, sizeof(ptrdiff_t));
                 i += sizeof(ptrdiff_t) - 1;
-                void (*f)() = (void (*)())len;
-                f();
+                void (*f)(Machine&) = (void (*)(Machine&))len;
+                f(*this);
             }
             else if (arr[i] == (uint8_t)COMMANDS::RUN)
             {
@@ -324,6 +328,33 @@ public:
                 memcpy(&len, arr.data() + i, sizeof(uint32_t));
                 i += sizeof(uint32_t) - 1;
                 args[reallen]=reg[len];
+            }
+            else if (arr[i] == (uint8_t)COMMANDS::POP_EX)
+            {
+                if (i + 4 >= arr.size())
+                    throw std::runtime_error("Invalid POP_EX instruction");
+                uint32_t len;
+                uint32_t reallen;
+                i++;
+                memcpy(&len, arr.data() + i, sizeof(uint32_t));
+                i += sizeof(uint32_t);
+                memcpy(&len, arr.data() + i, sizeof(uint32_t));
+                i += sizeof(uint32_t) - 1;
+                reg[len]=stack[reallen];
+                stack.erase(stack.begin()+len);
+            }
+            else if (arr[i] == (uint8_t)COMMANDS::PEEK_STACK)
+            {
+                if (i + 4 >= arr.size())
+                    throw std::runtime_error("Invalid PEEK_STACK instruction");
+                uint32_t len;
+                uint32_t reallen;
+                i++;
+                memcpy(&len, arr.data() + i, sizeof(uint32_t));
+                i += sizeof(uint32_t);
+                memcpy(&len, arr.data() + i, sizeof(uint32_t));
+                i += sizeof(uint32_t) - 1;
+                reg[len]=stack[reallen];
             }
             else if (arr[i] == (uint8_t)COMMANDS::RUN)
             {
