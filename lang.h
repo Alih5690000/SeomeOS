@@ -273,7 +273,7 @@ public:
                 uint32_t len;
                 i++;
                 memcpy(&len, arr.data() + i, sizeof(uint32_t));
-                i += sizeof(uint32_t);
+                i += sizeof(uint32_t) - 1;
                 reg[len] = ret;
             }
             else if (arr[i] == (uint8_t)COMMANDS::PUSH_REG)
@@ -283,7 +283,7 @@ public:
                 uint32_t len;
                 i++;
                 memcpy(&len, arr.data() + i, sizeof(uint32_t));
-                i += sizeof(uint32_t);
+                i += sizeof(uint32_t) - 1;
                 stack.push_back(reg[len]);
             }
             else if (arr[i] == (uint8_t)COMMANDS::REG_TO_RET)
@@ -293,7 +293,7 @@ public:
                 uint32_t len;
                 i++;
                 memcpy(&len, arr.data() + i, sizeof(uint32_t));
-                i += sizeof(uint32_t);
+                i += sizeof(uint32_t) - 1;
                 ret = reg[len];
             }
             else if (arr[i] == (uint8_t)COMMANDS::CALL)
@@ -305,7 +305,7 @@ public:
                 i++;
                 memcpy(&len, arr.data() + i, sizeof(ptrdiff_t));
                 i += sizeof(ptrdiff_t) - 1;
-                void (*f)(Machine&) = (void (*)(Machine&))len;
+                void (*f)(Machine &) = (void (*)(Machine &))len;
                 f(*this);
             }
             else if (arr[i] == (uint8_t)COMMANDS::RUN)
@@ -318,13 +318,13 @@ public:
                 i++;
                 memcpy(&len, arr.data() + i, sizeof(ptrdiff_t));
                 i += sizeof(ptrdiff_t);
-                memcpy(&len, arr.data() + i, sizeof(uint32_t));
+                memcpy(&reallen, arr.data() + i, sizeof(uint32_t));
                 i += sizeof(uint32_t) - 1;
                 std::vector<uint8_t> v;
                 v.resize(reallen);
                 memcpy(v.data(), (void *)len, reallen);
                 Machine ma;
-                ma.args=args;
+                ma.args = args;
                 ma.exec(v);
                 ret = ma.ret;
             }
@@ -339,7 +339,7 @@ public:
                 i += sizeof(uint32_t);
                 memcpy(&reallen, arr.data() + i, sizeof(uint32_t));
                 i += sizeof(uint32_t) - 1;
-                args[reallen]=reg[len];
+                args[reallen] = reg[len];
             }
             else if (arr[i] == (uint8_t)COMMANDS::POP_EX)
             {
@@ -352,8 +352,8 @@ public:
                 i += sizeof(uint32_t);
                 memcpy(&reallen, arr.data() + i, sizeof(uint32_t));
                 i += sizeof(uint32_t) - 1;
-                reg[len]=stack[reallen];
-                stack.erase(stack.begin()+reallen);
+                reg[len] = stack[reallen];
+                stack.erase(stack.begin() + reallen);
             }
             else if (arr[i] == (uint8_t)COMMANDS::PEEK_STACK)
             {
@@ -367,17 +367,17 @@ public:
                 memcpy(&reallen, arr.data() + i, sizeof(uint32_t));
                 i += sizeof(uint32_t) - 1;
                 reg
-                [len]=stack[reallen];
+                    [len] = stack[reallen];
             }
             else if (arr[i] == (uint8_t)COMMANDS::REG_TO_REG)
             {
                 LOG("[CALL]");
                 if (i + 4 >= arr.size())
                     throw std::runtime_error("Invalid BUFF instruction");
-                ptrdiff_t len;
+                uint32_t len;
                 uint32_t reallen;
                 i++;
-                memcpy(&len, arr.data() + i, sizeof(ptrdiff_t));
+                memcpy(&len, arr.data() + i, sizeof(uint32_t));
                 i += sizeof(ptrdiff_t);
                 memcpy(&reallen, arr.data() + i, sizeof(uint32_t));
                 i += sizeof(uint32_t) - 1;

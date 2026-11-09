@@ -12,6 +12,14 @@ void transaletToStr(Machine& ma){
     memcpy(m.reg[0].data(), str.data(), str.size());
 }
 
+void transaletToStrTrue(Machine& ma){
+    uint32_t num=*(uint32_t*)ma.args[0].data();
+    LOG("[transaltor]:num is "+std::to_string(num));
+    std::string str=std::to_string((int)num);
+    ma.ret.resize(str.size());
+    memcpy(ma.ret.data(), str.data(), str.size());
+}
+
 int main()
 {
     std::vector<std::uint8_t> coms = {
@@ -91,10 +99,17 @@ int main()
 
         (uint8_t)COMMANDS::POP_EX,
         SPLIT_U32(0),
+        SPLIT_U32(1),
+
+        (uint8_t)COMMANDS::REG_TO_ARG,
+        SPLIT_U32(0),
         SPLIT_U32(0),
 
         (uint8_t)COMMANDS::CALL,
-        SPLIT_U64((ptrdiff_t)&transaletToStr),
+        SPLIT_U64((ptrdiff_t)&transaletToStrTrue),
+
+        (uint8_t)COMMANDS::RET_TO_REG,
+        SPLIT_U32(0),
 
         (uint8_t)COMMANDS::REG_TO_BUFF,
         SPLIT_U32(0),
