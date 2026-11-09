@@ -72,10 +72,39 @@ int main()
         SPLIT_U32(2),
         'p', 't'
     };
+    std::vector<uint8_t> coms2={
+        (uint8_t)COMMANDS::REG,
+        SPLIT_U32(0),
+        SPLIT_U32(4),
+        SPLIT_U32(1),
+
+        (uint8_t)COMMANDS::PUSH_REG,
+        SPLIT_U32(0),
+
+        (uint8_t)COMMANDS::REG,
+        SPLIT_U32(0),
+        SPLIT_U32(4),
+        SPLIT_U32(2),
+
+        (uint8_t)COMMANDS::PUSH_REG,
+        SPLIT_U32(0),
+
+        (uint8_t)COMMANDS::POP_EX,
+        SPLIT_U32(0),
+        SPLIT_U32(0),
+
+        (uint8_t)COMMANDS::CALL,
+        SPLIT_U64((ptrdiff_t)&transaletToStr),
+
+        (uint8_t)COMMANDS::REG_TO_BUFF,
+        SPLIT_U32(0),
+
+        (uint8_t)COMMANDS::PRINT
+    };
     /*const uint8_t s[]="lmao";
     m.buff.resize(sizeof(s));
     memcpy(m.buff.data(), s, sizeof(s));*/
-    m.cache(coms);
-    m.exec(coms);
+    m.cache(coms2);
+    m.exec(coms2);
     return 0;
 }

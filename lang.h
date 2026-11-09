@@ -39,6 +39,7 @@ enum class COMMANDS
     EQUAL,
     REG,
     PUSH,
+    PUSH_REG,
     POP,
     POP_EX,
     PEEK_STACK,
@@ -137,6 +138,7 @@ public:
             case COMMANDS::POP:
             case COMMANDS::REG_TO_BUFF:
             case COMMANDS::BUFF_TO_REG:
+            case COMMANDS::PUSH_REG:
             case COMMANDS::REG_TO_RET:
             case COMMANDS::RET_TO_REG:
             {
@@ -274,6 +276,16 @@ public:
                 i += sizeof(uint32_t);
                 reg[len] = ret;
             }
+            else if (arr[i] == (uint8_t)COMMANDS::PUSH_REG)
+            {
+                if (i + 4 >= arr.size())
+                    throw std::runtime_error("Invalid PUSH_REG instruction");
+                uint32_t len;
+                i++;
+                memcpy(&len, arr.data() + i, sizeof(uint32_t));
+                i += sizeof(uint32_t);
+                stack.push_back(reg[len]);
+            }
             else if (arr[i] == (uint8_t)COMMANDS::REG_TO_RET)
             {
                 if (i + 4 >= arr.size())
@@ -325,7 +337,7 @@ public:
                 i++;
                 memcpy(&len, arr.data() + i, sizeof(uint32_t));
                 i += sizeof(uint32_t);
-                memcpy(&len, arr.data() + i, sizeof(uint32_t));
+                memcpy(&reallen, arr.data() + i, sizeof(uint32_t));
                 i += sizeof(uint32_t) - 1;
                 args[reallen]=reg[len];
             }
@@ -338,10 +350,10 @@ public:
                 i++;
                 memcpy(&len, arr.data() + i, sizeof(uint32_t));
                 i += sizeof(uint32_t);
-                memcpy(&len, arr.data() + i, sizeof(uint32_t));
+                memcpy(&reallen, arr.data() + i, sizeof(uint32_t));
                 i += sizeof(uint32_t) - 1;
                 reg[len]=stack[reallen];
-                stack.erase(stack.begin()+len);
+                stack.erase(stack.begin()+reallen);
             }
             else if (arr[i] == (uint8_t)COMMANDS::PEEK_STACK)
             {
@@ -352,11 +364,12 @@ public:
                 i++;
                 memcpy(&len, arr.data() + i, sizeof(uint32_t));
                 i += sizeof(uint32_t);
-                memcpy(&len, arr.data() + i, sizeof(uint32_t));
+                memcpy(&reallen, arr.data() + i, sizeof(uint32_t));
                 i += sizeof(uint32_t) - 1;
-                reg[len]=stack[reallen];
+                reg
+                [len]=stack[reallen];
             }
-            else if (arr[i] == (uint8_t)COMMANDS::RUN)
+            else if (arr[i] == (uint8_t)COMMANDS::REG_TO_REG)
             {
                 LOG("[CALL]");
                 if (i + 4 >= arr.size())
@@ -366,7 +379,7 @@ public:
                 i++;
                 memcpy(&len, arr.data() + i, sizeof(ptrdiff_t));
                 i += sizeof(ptrdiff_t);
-                memcpy(&len, arr.data() + i, sizeof(uint32_t));
+                memcpy(&reallen, arr.data() + i, sizeof(uint32_t));
                 i += sizeof(uint32_t) - 1;
                 reg[len] = reg[reallen];
             }
