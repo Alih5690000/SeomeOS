@@ -262,6 +262,7 @@ public:
                 i += sizeof(uint32_t);
                 if (len > arr.size() - i)
                     throw std::runtime_error("Invalid BUFF data");
+                buff.clear();
                 buff.resize(len);
                 memcpy(buff.data(), arr.data() + i, len);
                 i += len - 1;
@@ -269,7 +270,7 @@ public:
             else if (arr[i] == (uint8_t)COMMANDS::RET_TO_REG)
             {
                 if (i + 4 >= arr.size())
-                    throw std::runtime_error("Invalid BUFF instruction");
+                    throw std::runtime_error("Invalid RET_TO_REG instruction");
                 uint32_t len;
                 i++;
                 memcpy(&len, arr.data() + i, sizeof(uint32_t));
@@ -289,7 +290,7 @@ public:
             else if (arr[i] == (uint8_t)COMMANDS::REG_TO_RET)
             {
                 if (i + 4 >= arr.size())
-                    throw std::runtime_error("Invalid BUFF instruction");
+                    throw std::runtime_error("Invalid REG_TO_RET instruction");
                 uint32_t len;
                 i++;
                 memcpy(&len, arr.data() + i, sizeof(uint32_t));
@@ -324,9 +325,11 @@ public:
                 v.resize(reallen);
                 memcpy(v.data(), (void *)len, reallen);
                 Machine ma;
-                ma.args = args;
+                ma.args = std::move(args);
+                ma.cache(v);
                 ma.exec(v);
-                ret = ma.ret;
+                args = std::move(ma.args);
+                ret = std::move(ma.ret);
             }
             else if (arr[i] == (uint8_t)COMMANDS::REG_TO_ARG)
             {
@@ -366,8 +369,7 @@ public:
                 i += sizeof(uint32_t);
                 memcpy(&reallen, arr.data() + i, sizeof(uint32_t));
                 i += sizeof(uint32_t) - 1;
-                reg
-                    [len] = stack[reallen];
+                reg[len] = stack[reallen];
             }
             else if (arr[i] == (uint8_t)COMMANDS::REG_TO_REG)
             {

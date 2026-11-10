@@ -114,7 +114,11 @@ int main()
         (uint8_t)COMMANDS::REG_TO_BUFF,
         SPLIT_U32(0),
 
-        (uint8_t)COMMANDS::PRINT
+        (uint8_t)COMMANDS::PRINT,
+
+        (uint8_t)COMMANDS::RUN,
+        SPLIT_U64((ptrdiff_t)coms.data()),
+        SPLIT_U32(coms.size())
     };
     /*const uint8_t s[]="lmao";
     m.buff.resize(sizeof(s));
