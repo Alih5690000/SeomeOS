@@ -4,6 +4,7 @@
 #include <iostream>
 #include <cstring>
 #include <map>
+#include "internal.h"
 #ifdef DEBUG
 #define LOG(x) std::cout << x << std::endl;
 #else
@@ -58,13 +59,53 @@ enum class COMMANDS
 
 class Machine
 {
-public:
+    public:
+    uint64_t limit= 1024 * 1024 * 16;
     std::vector<std::uint8_t> buff;
     std::vector<std::vector<std::uint8_t>> stack;
     std::vector<std::vector<std::uint8_t>> reg;
-    std::vector<std::vector<std::uint8_t>> args;
     std::map<std::string, int> points;
     std::vector<uint8_t> ret;
+    std::vector<std::vector<std::uint8_t>> args;
+    uint64_t memoryEaten(){
+        uint64_t res;
+        res+=buff.size();
+        for (const auto& i:reg){
+            res+=i.size();
+        }
+        for (const auto& i:args){
+            res+=i.size();
+        }
+        for (const auto& i:stack){
+            res+=i.size();
+        }
+        res+=ret.size();
+        return res;
+    }
+    void check(const std::vector<std::uint8_t>& v, uint64_t to){
+        if (memoryEaten()-v.size()+to>=limit){
+            throw std::runtime_error("Memory limit violated");
+        }
+    }
+    void check(const std::vector<std::vector<std::uint8_t>>& v, uint64_t to){
+        uint64_t size;
+        for (const auto& i:v){
+            size+=i.size();
+        }
+        if (memoryEaten()-size+to>=limit){
+            throw std::runtime_error("Memory limit violated");
+        }
+    }
+    uint64_t getSize(const std::vector<std::vector<std::uint8_t>>& v){
+        uint64_t size;
+        for (const auto& i:v){
+            size+=i.size();
+        }
+        return size;
+    }
+    uint64_t getSize(const std::vector<std::uint8_t>& v){
+        return v.size();
+    }
     Machine()
     {
         reg.resize(256);
@@ -238,7 +279,7 @@ public:
         }
     }
 
-    void exec(std::vector<std::uint8_t> arr)
+    void exec(const std::vector<std::uint8_t>& arr)
     {
         for (int i = 0; i < arr.size(); i++)
         {
@@ -262,7 +303,7 @@ public:
                 i += sizeof(uint32_t);
                 if (len > arr.size() - i)
                     throw std::runtime_error("Invalid BUFF data");
-                buff.clear();
+                check(buff, getSize(buff)+len);
                 buff.resize(len);
                 memcpy(buff.data(), arr.data() + i, len);
                 i += len - 1;
@@ -283,6 +324,7 @@ public:
                     throw std::runtime_error("Invalid PUSH_REG instruction");
                 uint32_t len;
                 i++;
+                check(stack, getSize(stack)+len);
                 memcpy(&len, arr.data() + i, sizeof(uint32_t));
                 i += sizeof(uint32_t) - 1;
                 stack.push_back(reg[len]);
@@ -391,6 +433,7 @@ public:
                     throw std::runtime_error("Invalid PUSH instruction");
                 uint32_t len;
                 i++;
+                check(stack, getSize(stack)+len);
                 memcpy(&len, arr.data() + i, sizeof(uint32_t));
                 i += sizeof(uint32_t);
                 stack.push_back(reg[len]);
@@ -472,6 +515,7 @@ public:
                 uint32_t len;
                 memcpy(&len, arr.data() + i, sizeof(uint32_t));
                 i += sizeof(uint32_t);
+                check(reg, getSize(reg)+len);
                 std::vector<uint8_t> data;
                 data.resize(len);
                 memcpy(data.data(), arr.data() + i, len);
