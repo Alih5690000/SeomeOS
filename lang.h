@@ -4,7 +4,6 @@
 #include <iostream>
 #include <cstring>
 #include <map>
-#include "internal.h"
 #ifdef DEBUG
 #define LOG(x) std::cout << x << std::endl;
 #else
@@ -68,7 +67,7 @@ class Machine
     std::vector<uint8_t> ret;
     std::vector<std::vector<std::uint8_t>> args;
     uint64_t memoryEaten(){
-        uint64_t res;
+        uint64_t res=0;
         res+=buff.size();
         for (const auto& i:reg){
             res+=i.size();
@@ -88,7 +87,7 @@ class Machine
         }
     }
     void check(const std::vector<std::vector<std::uint8_t>>& v, uint64_t to){
-        uint64_t size;
+        uint64_t size=0;
         for (const auto& i:v){
             size+=i.size();
         }
@@ -97,7 +96,7 @@ class Machine
         }
     }
     uint64_t getSize(const std::vector<std::vector<std::uint8_t>>& v){
-        uint64_t size;
+        uint64_t size=0;
         for (const auto& i:v){
             size+=i.size();
         }
@@ -303,7 +302,7 @@ class Machine
                 i += sizeof(uint32_t);
                 if (len > arr.size() - i)
                     throw std::runtime_error("Invalid BUFF data");
-                check(buff, getSize(buff)+len);
+                check(buff, len);
                 buff.resize(len);
                 memcpy(buff.data(), arr.data() + i, len);
                 i += len - 1;
@@ -324,8 +323,8 @@ class Machine
                     throw std::runtime_error("Invalid PUSH_REG instruction");
                 uint32_t len;
                 i++;
-                check(stack, getSize(stack)+len);
                 memcpy(&len, arr.data() + i, sizeof(uint32_t));
+                check(stack, getSize(stack)+len);
                 i += sizeof(uint32_t) - 1;
                 stack.push_back(reg[len]);
             }
@@ -433,8 +432,8 @@ class Machine
                     throw std::runtime_error("Invalid PUSH instruction");
                 uint32_t len;
                 i++;
-                check(stack, getSize(stack)+len);
                 memcpy(&len, arr.data() + i, sizeof(uint32_t));
+                check(stack, getSize(stack)+len);
                 i += sizeof(uint32_t);
                 stack.push_back(reg[len]);
             }
@@ -515,7 +514,7 @@ class Machine
                 uint32_t len;
                 memcpy(&len, arr.data() + i, sizeof(uint32_t));
                 i += sizeof(uint32_t);
-                check(reg, getSize(reg)+len);
+                check(reg, getSize(reg) - reg[num].size() + len);
                 std::vector<uint8_t> data;
                 data.resize(len);
                 memcpy(data.data(), arr.data() + i, len);
